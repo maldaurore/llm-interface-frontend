@@ -33,6 +33,7 @@ const LoginPage: React.FC = () => {
 
       const data = await response.json();
       localStorage.setItem("user", JSON.stringify(data));
+      await new Promise((res) => setTimeout(res, 0));
       navigate("/new-chat", { replace: true });
 
     } catch (err: any) {

@@ -14,22 +14,22 @@ if (!rootElement) {
 
 const router = createBrowserRouter([
   {
-    path: '/',
-    element:  <Layout />,
-    children: [
-      { path: "", element: <Navigate to="/new-chat" replace /> },
-      { path: "new-chat", element: <ChatInterface key="new-chat" /> },
-      { path: "chat/:id", element: <ChatWrapper /> },
-    ]
-  },
-  {
     path: '/login',
     element: <LoginPage />
   },
   {
     path: '/register',
     element: <RegisterPage />
-  }
+  },
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { path: "", element: <Navigate to="/new-chat" replace />},
+      {path: "new-chat", element: <ChatInterface />},
+      { path: "chat/:id", element: <ChatWrapper /> },
+    ]
+  },
 ])
 
 const root = ReactDOM.createRoot(rootElement);
