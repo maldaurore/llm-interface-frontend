@@ -1,28 +1,27 @@
-/**
- * Enum for message sender.
- * @readonly
- * @enum {string}
- */
-export const Sender = {
-  USER: 'user',
-  AI: 'ai',
-};
+export enum Sender {
+  USER = 'user',
+  AI = 'ai',
+}
 
-/**
- * @typedef {Object} ChatMessage
- * @property {string} id
- * @property {string} text
- * @property {Sender[keyof Sender]} sender - user or ai
- * @property {number} timestamp
- * @property {boolean} [isError] - Optional flag for error messages
- * @property {Array<object>} [groundingChunks] - Optional for search grounding results
- */
+export interface ChatMessage {
+  _id: string;
+  text: string;
+  sender: Sender;
+  timestamp: number;
+  isError?: boolean;
+  groundingChunks?: object[];
+}
 
-/**
- * @typedef {Object} ModelOption
- * @property {string} id
- * @property {string} name
- */
+export interface ModelOption {
+  id: string;
+  name: string;
+}
 
-// No actual code needed here beyond exports if types are primarily for JSDoc.
-// The Sender object is exported for runtime use.
+export interface Chat {
+  _id: string;
+  title: string;
+  messages?: ChatMessage[];
+  user?: string;
+  model?: string;
+  createdAt: number;
+}

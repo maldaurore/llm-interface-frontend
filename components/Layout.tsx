@@ -1,10 +1,12 @@
-import { isTokenExpiringSoon, refreshAccessToken } from '@/utils/tokens';
+import { Chat } from '@/types';
+import { getUserToken, isTokenExpiringSoon, refreshAccessToken } from '@/utils/tokens';
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 
 const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [ loading, setLoading ] = useState(true);
+  const [ chats, setChats ] = useState<Chat[]>([]);
   const userString = localStorage.getItem("user");
   if (!userString) {
     return <Navigate to="/login" replace />;
@@ -12,6 +14,7 @@ const Layout: React.FC = () => {
   const user = JSON.parse(userString) as { access_token: string; refresh_token: string };
   const token = user.access_token;
   const refreshToken = user?.refresh_token;
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const checkToken = async () => {
@@ -29,8 +32,34 @@ const Layout: React.FC = () => {
     checkToken();
   }, [token, refreshToken]);
 
+  useEffect(() => {
+    // Obtener chats
+    const getUserChats = async () => {
+      const response = await fetch(`${baseUrl}/chats/user-chats`, {
+        headers: {
+          Authorization: `Bearer ${await getUserToken()}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const json = await response.json();
+  
+      setChats(json.chats);
+    }
+
+    getUserChats();
+  }, []);
+
+  const handleNewChatCreated = (chat: Chat) => {
+    setChats(prevChats => [chat, ...prevChats]);
+    const newPath = `/chat/${chat._id}`;
+    window.history.pushState({}, '', newPath);
+  }
+
   const handleLogout = () => {
-    // Aquí puedes limpiar tokens o sesión
     localStorage.removeItem('user');
     navigate('/login');
   };
@@ -61,15 +90,17 @@ const Layout: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto">
           <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Chats anteriores</h3>
+          {chats.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No tienes chats anteriores.</p>
+          )}
           <ul className="space-y-2">
-            {/* Simulación de chats */}
-            {[1, 2, 3].map((chatId) => (
-              <li key={chatId}>
+            {chats.map((chat) => (
+              <li key={chat._id}>
                 <button
-                  onClick={() => navigate(`/chat/${chatId}`)}
+                  onClick={() => navigate(`/chat/${chat._id}`)}
                   className="w-full text-left px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-md text-sm text-slate-900 dark:text-white"
                 >
-                  Chat #{chatId}
+                  {chat.title}
                 </button>
               </li>
             ))}
@@ -86,7 +117,7 @@ const Layout: React.FC = () => {
 
       {/* Panel derecho donde cambia el contenido */}
       <main className="flex-1 p-4 overflow-y-auto">
-        <Outlet />
+        <Outlet context={{ handleNewChatCreated }} />
       </main>
     </div>
   );

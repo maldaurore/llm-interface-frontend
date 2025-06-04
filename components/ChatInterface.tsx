@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-// Import types from SDK
-import { GoogleGenAI, Chat, GenerateContentResponse, GroundingChunk } from "@google/genai";
-// Import local types/enums (assuming types.ts is now a .ts file)
-import { Sender, ChatMessage, ModelOption } from '../types'; // Adjusted import path if types.ts
-import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants'; // Assuming constants.ts exports ModelOption compatible types
+import { GoogleGenAI, Chat, GroundingChunk } from "@google/genai";
+import { Sender, ChatMessage, ModelOption, Chat as ChatType } from '../types';
+import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
+import { createChat, generateChatTitle, getChat } from '@/utils/chat-helpers';
+import { useOutletContext, useParams } from 'react-router-dom';
 
-// Props for icon components (can be more specific if needed)
 interface IconProps {
   className?: string;
+}
+
+interface LayoutContext {
+  handleNewChatCreated: (chat: ChatType) => void;
 }
 
 // --- Icons ---
@@ -38,6 +41,7 @@ const MoonIcon: React.FC<IconProps> = ({ className }) => (
 // --- End Icons ---
 
 const ChatInterface: React.FC = () => {
+  const { id } = useParams()
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
@@ -45,6 +49,7 @@ const ChatInterface: React.FC = () => {
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [aiInstance, setAiInstance] = useState<GoogleGenAI | null>(null);
   const [chatSession, setChatSession] = useState<Chat | null>(null);
+  const [chatId, setChatId] = useState<string | null | undefined>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -53,9 +58,26 @@ const ChatInterface: React.FC = () => {
     }
     return false;
   });
+  const [ isGeneratingResponse, setIsGeneratingResponse ] = useState<boolean>(false);
+  const { handleNewChatCreated } = useOutletContext<LayoutContext>();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    // Verifica si hay un chatId en los parámetros de la URL
+    // Si hay, carga el chat correspondiente
+    const onIdChange = async () => {
+      setChatId(id);
+      if (id && id !== undefined) {
+        console.log(`Cargando chat con ID: ${id}`);
+        const chat = await getChat(id);
+        setMessages(chat.messages || []);
+      }
+    }
+    onIdChange();
+    
+  }, [id])
 
   useEffect(() => {
     if (darkMode) {
@@ -73,18 +95,18 @@ const ChatInterface: React.FC = () => {
     console.log("Intentando inicializar GoogleGenAI...");
     const key = process.env.API_KEY;
     if (!key) {
-      console.error("API_KEY environment variable not found.");
-      setApiKeyError("API_KEY environment variable not found. Please set it up to use the chat.");
+      console.error("Variable de entorno API_KEY no encontrada.");
+      setApiKeyError("Variable de entorno API_KEY no encontrada. Favor de configurarla para utilizar el chat.");
       return;
     }
     try {
       const genAI = new GoogleGenAI({ apiKey: key });
       setAiInstance(genAI);
       setApiKeyError(null);
-      console.log("GoogleGenAI initialized successfully.");
+      console.log("GoogleGenAI inicializado exitosamente.");
     } catch (error: any) {
-      console.error("Failed to initialize GoogleGenAI:", error);
-      setApiKeyError(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error al inicializar GoogleGenAI:", error);
+      setApiKeyError(`Inicialización fallida: ${error instanceof Error ? error.message : String(error)}`);
     }
   }, []);
 
@@ -99,13 +121,6 @@ const ChatInterface: React.FC = () => {
 
         const chatConfig = {
           model: currentModelDetails.id,
-          // Add other config like systemInstruction or thinkingConfig here if needed
-          // config: {
-          //   systemInstruction: "You are a helpful assistant.",
-          //   ...(currentModelDetails.id === 'gemini-2.5-flash-preview-04-17' && {
-          //     thinkingConfig: { thinkingBudget: 0 } // Example: disable thinking for flash model
-          //   })
-          // }
         };
 
         const newChat = aiInstance.chats.create(chatConfig);
@@ -113,7 +128,7 @@ const ChatInterface: React.FC = () => {
         console.log(`Sesión de chat creada exitosamente con ${currentModelDetails.name}.`);
         setMessages([
           {
-            id: Date.now().toString() + '_ai_greeting',
+            _id: Date.now().toString() + '_ai_greeting',
             text: `¡Hola! Estoy usando ${currentModelDetails.name}. ¿Qué puedo hacer por ti?`,
             sender: Sender.AI,
             timestamp: Date.now(),
@@ -123,8 +138,8 @@ const ChatInterface: React.FC = () => {
       } catch (error: any) {
         console.error(`Error de creación de sesión de chat para: ${selectedModel}:`, error);
         setApiKeyError(`Falló la creación del chat: ${error instanceof Error ? error.message : String(error)}`);
-        setChatSession(null); // Ensure chat session is null on error
-        setMessages([]); // Clear messages on error
+        setChatSession(null);
+        setMessages([]);
       }
     }
   }, [aiInstance, selectedModel]);
@@ -144,7 +159,7 @@ const ChatInterface: React.FC = () => {
 
     const userMessageText = inputValue.trim();
     const userMessage: ChatMessage = {
-      id: Date.now().toString() + '_user',
+      _id: Date.now().toString() + '_user',
       text: userMessageText,
       sender: Sender.USER,
       timestamp: Date.now(),
@@ -152,7 +167,7 @@ const ChatInterface: React.FC = () => {
 
     const aiResponseId = Date.now().toString() + '_ai_stream';
     const aiPlaceholderMessage: ChatMessage = {
-      id: aiResponseId,
+      _id: aiResponseId,
       text: '',
       sender: Sender.AI,
       timestamp: Date.now(),
@@ -166,16 +181,18 @@ const ChatInterface: React.FC = () => {
 
     let streamFullyProcessed = false;
 
-    try {/*
+    try {
+      setIsGeneratingResponse(true);
       console.log(`[${new Date().toISOString()}] handleSendMessage: Calling sendMessageStream for ${aiResponseId}`);
+      // Llamada al stream de mensajes. Esta función retorna un stream iterable
       const stream = await chatSession.sendMessageStream({ message: userMessageText });
       console.log(`[${new Date().toISOString()}] handleSendMessage: sendMessageStream call returned, starting iteration for ${aiResponseId}`);
       
       let accumulatedAiText = "";
       let groundingChunks: GroundingChunk[] = [];
 
+      // Se itera el stream para ir acumulando el texto de la respuesta AI
       for await (const chunk of stream) {
-        // chunk is already correctly typed as GenerateContentResponse by the SDK's stream
         const chunkText = chunk.text;
         if (chunkText) {
           accumulatedAiText += chunkText;
@@ -184,39 +201,40 @@ const ChatInterface: React.FC = () => {
           groundingChunks = chunk.candidates[0].groundingMetadata.groundingChunks;
         }
         
-        // Log small part of chunk text to avoid overly verbose logs
-        const loggableChunkText = chunkText ? (chunkText.length > 50 ? chunkText.substring(0,50) + "..." : chunkText) : "[no text in chunk]";
-        console.log(`[${new Date().toISOString()}] handleSendMessage: Chunk for ${aiResponseId}. Text: "${loggableChunkText}"`);
-        */
+        // Actualizar el mensaje AI en tiempo real
         setMessages(prev =>
           prev.map(msg =>
-            msg.id === aiResponseId ? { 
+            msg._id === aiResponseId ? { 
               ...msg, 
-              text: userMessageText, 
-              groundingChunks: /*groundingChunks.length > 0 ? groundingChunks :*/ undefined 
+              text: accumulatedAiText, 
+              groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined 
             } : msg
           )
         );
-      //}
-      //treamFullyProcessed = true;
-      //console.log(`[${new Date().toISOString()}] handleSendMessage: Stream loop FINISHED for ${aiResponseId}. Accumulated text: "${accumulatedAiText.substring(0,100)}..."`);
+      }
+      // Se terminó de procesar el stream
+      setIsGeneratingResponse(false);
+      streamFullyProcessed = true;
+      console.log(`[${new Date().toISOString()}] handleSendMessage: Stream loop FINISHED for ${aiResponseId}. Accumulated text: "${accumulatedAiText.substring(0,100)}..."`);
 
-      // Final update if text was empty but there are grounding chunks
-      /*if (!accumulatedAiText && groundingChunks.length > 0) {
+      // Actualización final si el texto está vacío pero hay chunks de grounding
+      if (!accumulatedAiText && groundingChunks.length > 0) {
         console.log(`[${new Date().toISOString()}] handleSendMessage: No accumulated text but grounding chunks exist for ${aiResponseId}. Setting default text.`);
         setMessages(prev =>
           prev.map(msg =>
-            msg.id === aiResponseId ? { ...msg, text: "Here's what I found:", groundingChunks } : msg
+            msg._id === aiResponseId ? { ...msg, text: "Aquí está lo que encontré:", groundingChunks } : msg
           )
         );
-      }*/
+      }
+      
     } catch (error: any) {
-      //streamFullyProcessed = true; // Consider stream ended on error
+      streamFullyProcessed = true; // Se marca como procesado aunque haya error
+      setIsGeneratingResponse(false);
       console.error(`[${new Date().toISOString()}] handleSendMessage: ERROR during stream for ${aiResponseId}:`, error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred processing the AI response.";
+      const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido al procesar la respuesta.";
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === aiResponseId ? { ...msg, text: `Sorry, an error occurred: ${errorMessage}`, isError: true } : msg
+          msg._id === aiResponseId ? { ...msg, text: `Lo siento, ocurrió un error: ${errorMessage}`, isError: true } : msg
         )
       );
     } finally {
@@ -226,6 +244,25 @@ const ChatInterface: React.FC = () => {
       inputRef.current?.focus();
     }
   }, [inputValue, chatSession, isLoading]); // Removed setMessages, setIsLoading from deps as they are stable
+
+  useEffect(() => {
+    const saveChat = async () => {
+      // Verificar si son los primeros mensajes, dejó de generar el ultimo mensaje y si
+      // no hay chatId (nuevo chat)
+      if (messages.length === 3 && !isGeneratingResponse && chatId === undefined) {
+        // Generar título del chat
+        let title = await generateChatTitle(messages);
+        // Guardar chat en la BD
+        const newChat = await createChat(title, messages, selectedModel);
+        setChatId(newChat._id);
+        // Llama a esta función de Layout.tsx para agregar el nuevo chat a la lista de chats
+        // y cambiar la URL a /chat/{newChat._id}
+        handleNewChatCreated(newChat);
+      }
+    }
+    saveChat();
+    
+  }, [messages])
 
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedModel(event.target.value);
@@ -265,7 +302,7 @@ const ChatInterface: React.FC = () => {
               onChange={handleModelChange}
               className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-xs sm:text-sm rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 disabled:opacity-50"
               disabled={isLoading || !chatSession}
-              aria-label="Select AI Model"
+              aria-label="Seleccione modelo deseado"
             >
               {AVAILABLE_MODELS.map((model: ModelOption) => ( // Added ModelOption type
                 <option key={model.id} value={model.id}>
@@ -285,7 +322,7 @@ const ChatInterface: React.FC = () => {
 
         <div className="flex-grow p-3 sm:p-4 space-y-4 overflow-y-auto">
           {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg._id} className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[80%] sm:max-w-[75%] py-2 px-3.5 shadow-sm break-words ${
                   msg.sender === Sender.USER
@@ -296,7 +333,7 @@ const ChatInterface: React.FC = () => {
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">
-                  {(msg.text === '' && msg.sender === Sender.AI && isLoading && messages.length > 0 && messages[messages.length -1].id === msg.id) ? 
+                  {(msg.text === '' && msg.sender === Sender.AI && isLoading && messages.length > 0 && messages[messages.length -1]._id === msg._id) ? 
                   <span className="flex items-center"><LoadingSpinner className="h-4 w-4 mr-2"/>Pensando...</span> : 
                   msg.text}
                 </p>

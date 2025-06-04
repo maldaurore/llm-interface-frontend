@@ -6,7 +6,6 @@
   <title>Zafirosoft Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Handles initial dark mode based on localStorage or system preference
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
@@ -24,7 +23,6 @@
 }
 </script>
 <style>
-  /* For a slightly more modern scrollbar, optional */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;

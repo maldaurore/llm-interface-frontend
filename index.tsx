@@ -5,7 +5,6 @@ import Layout from './components/Layout.tsx';
 import LoginPage from './components/LoginPage.tsx';
 import RegisterPage from './components/RegisterPage.tsx';
 import ChatInterface from './components/ChatInterface.tsx';
-import ChatWrapper from './components/ChatWrapper.tsx';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -26,8 +25,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: "", element: <Navigate to="/new-chat" replace />},
-      {path: "new-chat", element: <ChatInterface />},
-      { path: "chat/:id", element: <ChatWrapper /> },
+      {path: "new-chat", element: <ChatInterface key={'new-chat'} />},
+      { path: "chat/:id", element: <ChatInterface /> },
     ]
   },
 ])
