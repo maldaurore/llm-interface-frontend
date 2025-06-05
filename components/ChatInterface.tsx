@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, GroundingChunk } from "@google/genai";
 import { Sender, ChatMessage, ModelOption, Chat as ChatType } from '../types';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
-import { createChat, generateChatTitle, getChat } from '@/utils/chat-helpers';
+import { createChat, generateChatTitle, getChat, updateChatMessages } from '@/utils/chat-helpers';
 import { useOutletContext, useParams } from 'react-router-dom';
 
 interface IconProps {
@@ -42,6 +42,7 @@ const MoonIcon: React.FC<IconProps> = ({ className }) => (
 
 const ChatInterface: React.FC = () => {
   const { id } = useParams()
+  const [isUserMessageSent, setIsUserMessageSent] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
@@ -173,6 +174,7 @@ const ChatInterface: React.FC = () => {
       timestamp: Date.now(),
     };
 
+    setIsUserMessageSent(true);
     setMessages(prev => [...prev, userMessage, aiPlaceholderMessage]);
     setInputValue('');
     setIsLoading(true);
@@ -246,23 +248,44 @@ const ChatInterface: React.FC = () => {
   }, [inputValue, chatSession, isLoading]); // Removed setMessages, setIsLoading from deps as they are stable
 
   useEffect(() => {
+
     const saveChat = async () => {
-      // Verificar si son los primeros mensajes, dejó de generar el ultimo mensaje y si
-      // no hay chatId (nuevo chat)
-      if (messages.length === 3 && !isGeneratingResponse && chatId === undefined) {
-        // Generar título del chat
-        let title = await generateChatTitle(messages);
-        // Guardar chat en la BD
-        const newChat = await createChat(title, messages, selectedModel);
-        setChatId(newChat._id);
-        // Llama a esta función de Layout.tsx para agregar el nuevo chat a la lista de chats
-        // y cambiar la URL a /chat/{newChat._id}
-        handleNewChatCreated(newChat);
+      
+      if (!isGeneratingResponse && isUserMessageSent) {
+        // Verificar si son los primeros mensajes y si
+        // no hay chatId (nuevo chat)
+        if (messages.length === 3 && !chatId) {
+          // Generar título del chat
+          let title = await generateChatTitle(messages);
+          // Guardar chat en la BD
+          const newChat = await createChat(title, messages, selectedModel);
+          setChatId(newChat._id);
+          // Llama a esta función de Layout.tsx para agregar el nuevo chat a la lista de chats
+          // y cambiar la URL a /chat/{newChat._id}
+          handleNewChatCreated(newChat);
+        } else if (messages.length > 3 && chatId) {
+  
+          // Obtener el ultimo par de mensajes
+          const lastPair = messages.slice(-2);
+          console.log('Actualizando mensajes del chat...', lastPair);
+          try {
+            await updateChatMessages(chatId, lastPair);
+            console.log('Chat actualizado.');
+          } catch (error) {
+            console.error('Error al actualizar el chat:', error);
+          }
+          
+        }
+
+        setIsUserMessageSent(false);
+
       }
-    }
+      
+    };
+      
     saveChat();
     
-  }, [messages])
+  }, [messages, isUserMessageSent])
 
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedModel(event.target.value);

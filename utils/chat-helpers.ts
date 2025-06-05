@@ -108,3 +108,34 @@ export async function getChat(chatId: string): Promise<ChatType> {
     throw e; // Re-lanzar error para manejarlo en el componente
   }
 }
+
+/**
+ * Actualiza los mensajes de un chat específico en el servidor.
+ *
+ * @param {string} chatId - El ID del chat que se desea actualizar.
+ * @param {ChatMessage[]} messages - Un array de mensajes que reemplazarán los mensajes actuales del chat.
+ * @returns {Promise<ChatType>} Una promesa que resuelve con los datos del chat actualizado.
+ * @throws {Error} Lanza un error si la solicitud al servidor falla.
+ */
+export async function updateChatMessages(
+  chatId: string,
+  messages: ChatMessage[]
+): Promise<void> {
+  try {
+    const response = await fetch(`${baseUrl}/chats/update-chat-messages`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await getUserToken()}`,
+      },
+      body: JSON.stringify({ chatId, messages }),
+    });
+    if (!response.ok) {
+      throw new Error(`Error al actualizar los mensajes del chat: ${response.status} ${response.statusText}`);
+    }
+    return;
+  } catch (e) {
+    console.error("Error al actualizar los mensajes del chat:", e);
+    throw e; // Re-lanzar error para manejarlo en el componente
+  }
+}
