@@ -44,6 +44,8 @@ const ChatInterface: React.FC = () => {
   const { id } = useParams()
   const [isUserMessageSent, setIsUserMessageSent] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatHistory, setChatHistory] = useState<string>('');
+  const isChatResumed = useRef<boolean>(false);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -73,6 +75,10 @@ const ChatInterface: React.FC = () => {
       if (id && id !== undefined) {
         console.log(`Cargando chat con ID: ${id}`);
         const chat = await getChat(id);
+        console.log('Creando historial...')
+        const history = buildHistory(chat.messages || []);
+        console.log(`Historial creado`);
+        setChatHistory(history);
         setMessages(chat.messages || []);
       }
     }
@@ -187,7 +193,14 @@ const ChatInterface: React.FC = () => {
       setIsGeneratingResponse(true);
       console.log(`[${new Date().toISOString()}] handleSendMessage: Calling sendMessageStream for ${aiResponseId}`);
       // Llamada al stream de mensajes. Esta función retorna un stream iterable
-      const stream = await chatSession.sendMessageStream({ message: userMessageText });
+      let messageToSend = ''
+      if (!isChatResumed.current) {
+        messageToSend = `Basado en este historial de chat contigo (IA), responde a mi mensaje: "${userMessageText}"\n\n${chatHistory}`;
+        isChatResumed.current = true; // Marcar que ya se ha iniciado el chat
+      } else {
+        messageToSend = userMessageText
+      }
+      const stream = await chatSession.sendMessageStream({ message: messageToSend });
       console.log(`[${new Date().toISOString()}] handleSendMessage: sendMessageStream call returned, starting iteration for ${aiResponseId}`);
       
       let accumulatedAiText = "";
@@ -267,7 +280,6 @@ const ChatInterface: React.FC = () => {
   
           // Obtener el ultimo par de mensajes
           const lastPair = messages.slice(-2);
-          console.log('Actualizando mensajes del chat...', lastPair);
           try {
             await updateChatMessages(chatId, lastPair);
             console.log('Chat actualizado.');
@@ -290,6 +302,18 @@ const ChatInterface: React.FC = () => {
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedModel(event.target.value);
   };
+
+  const buildHistory = (messages: ChatMessage[]) => {
+    let history = "";
+    messages.forEach((msg) => {
+      if (msg.sender === Sender.USER) {
+        history += `Usuario: ${msg.text}\n`;
+      } else if (msg.sender === Sender.AI) {
+        history += `AI: ${msg.text}\n`;
+      }
+    });
+    return history;
+  }
 
   if (apiKeyError) {
     return (

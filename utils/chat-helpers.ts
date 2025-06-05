@@ -101,7 +101,6 @@ export async function getChat(chatId: string): Promise<ChatType> {
       throw new Error(`Error al obtener el chat: ${response.status} ${response.statusText}`);
     }
     const chat = await response.json();
-    console.log("Chat obtenido:", chat);
     return chat.chat;
   } catch (e) {
     console.error("Error al obtener el chat:", e);
