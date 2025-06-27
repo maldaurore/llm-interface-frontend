@@ -2,15 +2,29 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import { ChatMessage, Sender } from '../types';
 import { Chat as ChatType } from '../types';
 import { getUserToken } from './tokens';
+import OpenAI from 'openai';
+import { AVAILABLE_MODELS } from '@/constants';
+import { EasyInputMessage, ResponseInput } from 'openai/resources/responses/responses.mjs';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const geminiAPIKey = import.meta.env.VITE_GEMINI_API_KEY;
+const openaiAPIKey = import.meta.env.VITE_OPENAI_API_KEY;
 const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
-if (!apiKey) {
-  throw new Error("VITE_API_KEY no está definida en las variables de entorno");
+if (!geminiAPIKey) {
+  throw new Error("La clave de API de Gemini no está definida en las variables de entorno");
+}
+if (!openaiAPIKey) {
+  throw new Error("La clave de API de OpenAI no está definida en las variables de entorno");
 }
 
-const genAI = new GoogleGenAI({ apiKey });
+const openai = new OpenAI({
+  apiKey: openaiAPIKey,
+  dangerouslyAllowBrowser: true,
+});
+
+const genAI = new GoogleGenAI({ 
+  apiKey: geminiAPIKey 
+});
 
 /**
  * Genera un título breve para un chat, usando los primeros mensajes como contexto.
@@ -55,7 +69,8 @@ export async function generateChatTitle(
 export async function createChat(
   title: string,
   messages: ChatMessage[],
-  model: string
+  model: string,
+  threadId: string | null = null
 ): Promise<ChatType> {
   try {
     const response = await fetch(`${baseUrl}/chats/new-chat`, {
@@ -68,6 +83,7 @@ export async function createChat(
         title,
         messages,
         model,
+        threadId,
       }),
     });
     if (!response.ok) {
@@ -136,5 +152,75 @@ export async function updateChatMessages(
   } catch (e) {
     console.error("Error al actualizar los mensajes del chat:", e);
     throw e; // Re-lanzar error para manejarlo en el componente
+  }
+}
+
+export async function getResponse(
+  messages: any[],
+  userMessage: ChatMessage,
+  model: string,
+  threadId: string | null
+): Promise<{threadId: string | null, response: string}> {
+  const type = AVAILABLE_MODELS.find(m => m.id === model)?.type;
+  if (!type) {
+    throw new Error(`Modelo no soportado: ${model}`);
+  }
+  if (type === 'model') {
+    const messagesToSend = [...messages, userMessage];
+    const history: EasyInputMessage[] = messagesToSend.map((msg) => ({
+      role: msg.sender === Sender.USER ? 'user' : 'assistant',
+      content: msg.text as string,
+      type: 'message'
+    }));
+
+    const input: ResponseInput = history
+    console.log(input);
+
+    const response = await openai.responses.create({
+      model,
+      input,
+    });
+
+    return {response: response.output_text, threadId: null}
+  } else if (type === 'assistant') {
+    
+    if (!threadId) {
+      const thread = await openai.beta.threads.create();
+      threadId = thread.id;
+    }
+
+    await openai.beta.threads.messages.create(threadId, {
+      role: 'user',
+      content: userMessage.text,
+    });
+
+    const run = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: model,
+    });
+
+    let status = run.status;
+    let runResult = run;
+
+    while (status !== "completed" && status !== "failed") {
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      runResult = await openai.beta.threads.runs.retrieve(run.id, {
+        thread_id: threadId,
+      });
+      status = runResult.status;
+    }
+
+    const messages = await openai.beta.threads.messages.list(threadId);
+    const lastMessage = messages.data.find(m => m.role === 'assistant');
+
+    const block = lastMessage?.content?.[0];
+
+    if (block && 'text' in block && typeof block.text?.value === 'string') {
+      return { threadId: threadId, response: block.text.value };
+    } else {
+      throw new Error("No se pudo obtener la respuesta del asistente.");
+    } 
+    
+  } else {
+    throw new Error(`Tipo de modelo desconocido: ${type}`);
   }
 }

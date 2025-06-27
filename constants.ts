@@ -3,7 +3,9 @@
 
 /** @type {import('./types.js').ModelOption[]} */
 export const AVAILABLE_MODELS = [
-  { id: 'gpt-4o', name: 'GPT-4o' },
+  { id: 'gpt-4o', name: 'GPT-4o', type: 'model' },
+  { id: 'asst_Ly6BU0FC3XtxPizI9zy6rhLs', name: 'Asistente de Asesor Fiscal', type: 'assistant' },
+  { id: 'braian-asistente-fiscal', name: 'Asistente de Asesor Fiscal BRAIAN', type: 'braian' },
   // Per instructions, only 'gemini-2.5-flash-preview-04-17' for general text tasks.
   // Add 'imagen-3.0-generate-002' if image generation features are added.
 ];

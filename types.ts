@@ -15,6 +15,7 @@ export interface ChatMessage {
 export interface ModelOption {
   id: string;
   name: string;
+  type: string
 }
 
 export interface Chat {
@@ -23,5 +24,6 @@ export interface Chat {
   messages?: ChatMessage[];
   user?: string;
   model?: string;
+  threadId?: string | null;
   createdAt: number;
 }

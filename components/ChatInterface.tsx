@@ -1,11 +1,10 @@
 // Adaptado completamente a OpenAI con el estilo visual original conservado
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import OpenAI from 'openai';
-import { Sender, ChatMessage, ModelOption, Chat as ChatType } from '../types';
+import { Sender, ChatMessage, Chat as ChatType } from '../types';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
-import { createChat, generateChatTitle, getChat, updateChatMessages } from '@/utils/chat-helpers';
+import { createChat, generateChatTitle, getChat, getResponse, updateChatMessages } from '@/utils/chat-helpers';
 import { useOutletContext, useParams } from 'react-router-dom';
-import { ChatCompletionMessageParam } from 'openai/resources';
 
 interface LayoutContext {
   handleNewChatCreated: (chat: ChatType) => void;
@@ -21,6 +20,7 @@ const ChatInterface: React.FC = () => {
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [aiInstance, setAiInstance] = useState<OpenAI | null>(null);
   const [chatId, setChatId] = useState<string | null | undefined>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const { handleNewChatCreated } = useOutletContext<LayoutContext>();
 
@@ -33,6 +33,8 @@ const ChatInterface: React.FC = () => {
       if (id) {
         const chat = await getChat(id);
         setMessages(chat.messages || []);
+        setSelectedModel(chat.model || DEFAULT_MODEL_ID);
+        setThreadId(chat.threadId || null);
       }
     };
     onIdChange();
@@ -58,7 +60,7 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     if (aiInstance) {
       const currentModel = AVAILABLE_MODELS.find(m => m.id === selectedModel);
-      if (currentModel) {
+      if (currentModel && messages.length === 0) {
         setMessages([{
           _id: Date.now().toString() + '_ai_greeting',
           text: `¡Hola! Estoy usando ${currentModel.name}. ¿Qué puedo hacer por ti?`,
@@ -99,26 +101,16 @@ const ChatInterface: React.FC = () => {
     setIsGeneratingResponse(true);
 
     try {
-      const history: ChatCompletionMessageParam[] = messages.map((msg) => ({
-        role: msg.sender === Sender.USER ? 'user' : 'assistant',
-        content: msg.text,
-      }));
 
-      const stream = await aiInstance.chat.completions.create({
-        model: selectedModel,
-        messages: [...history, { role: 'user', content: userText }],
-        stream: true,
-      });
+      const response = await getResponse(messages, userMessage, selectedModel, threadId);
 
-      let fullText = '';
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          fullText += delta;
-          setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: fullText } : msg));
-        }
+      if (response.threadId) {
+        setThreadId(response.threadId);
       }
+      setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: response.response } : msg));
+
     } catch (error: any) {
+      console.error('Error al generar respuesta:', error);
       setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: 'Error al generar respuesta.', isError: true } : msg));
     } finally {
       setIsLoading(false);
@@ -132,7 +124,7 @@ const ChatInterface: React.FC = () => {
       if (!isGeneratingResponse && isUserMessageSent) {
         if (messages.length === 3 && !chatId) {
           const title = await generateChatTitle(messages);
-          const newChat = await createChat(title, messages, selectedModel);
+          const newChat = await createChat(title, messages, selectedModel, threadId);
           setChatId(newChat._id);
           handleNewChatCreated(newChat);
         } else if (messages.length > 3 && chatId) {
@@ -178,6 +170,7 @@ const ChatInterface: React.FC = () => {
           <select
             value={selectedModel}
             onChange={handleModelChange}
+            disabled={typeof chatId === 'string'}
             className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-xs sm:text-sm rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2"
           >
             {AVAILABLE_MODELS.map(model => (
