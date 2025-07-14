@@ -25,5 +25,11 @@ export interface Chat {
   user?: string;
   model?: string;
   threadId?: string | null;
+  braianSessionId?: string | null;
   createdAt: number;
+}
+
+export interface NewChat {
+  _id: string;
+  title: string;
 }

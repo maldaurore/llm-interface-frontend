@@ -1,26 +1,21 @@
 // Adaptado completamente a OpenAI con el estilo visual original conservado
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import OpenAI from 'openai';
-import { Sender, ChatMessage, Chat as ChatType } from '../types';
+import { Sender, ChatMessage, NewChat } from '../types';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
-import { createChat, generateChatTitle, getChat, getResponse, updateChatMessages } from '@/utils/chat-helpers';
+import { getChat, getResponse } from '@/utils/chat-helpers';
 import { useOutletContext, useParams } from 'react-router-dom';
 
 interface LayoutContext {
-  handleNewChatCreated: (chat: ChatType) => void;
+  handleNewChatCreated: (chat: NewChat) => void;
 }
 
 const ChatInterface: React.FC = () => {
   const { id } = useParams();
-  const [isUserMessageSent, setIsUserMessageSent] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
-  const [aiInstance, setAiInstance] = useState<OpenAI | null>(null);
   const [chatId, setChatId] = useState<string | null | undefined>(null);
-  const [threadId, setThreadId] = useState<string | null>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const { handleNewChatCreated } = useOutletContext<LayoutContext>();
 
@@ -34,42 +29,10 @@ const ChatInterface: React.FC = () => {
         const chat = await getChat(id);
         setMessages(chat.messages || []);
         setSelectedModel(chat.model || DEFAULT_MODEL_ID);
-        setThreadId(chat.threadId || null);
       }
     };
     onIdChange();
   }, [id]);
-
-  useEffect(() => {
-    const key = process.env.OPENAI_API_KEY;
-    if (!key) {
-      setApiKeyError('Variable de entorno OPENAI_API_KEY no encontrada.');
-      return;
-    }
-    try {
-      const openai = new OpenAI({
-        apiKey: key,
-        dangerouslyAllowBrowser: true,
-      });
-      setAiInstance(openai);
-    } catch (error: any) {
-      setApiKeyError(`Inicialización fallida: ${error.message || String(error)}`);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (aiInstance) {
-      const currentModel = AVAILABLE_MODELS.find(m => m.id === selectedModel);
-      if (currentModel && messages.length === 0) {
-        setMessages([{
-          _id: Date.now().toString() + '_ai_greeting',
-          text: `¡Hola! Estoy usando ${currentModel.name}. ¿Qué puedo hacer por ti?`,
-          sender: Sender.AI,
-          timestamp: Date.now(),
-        }]);
-      }
-    }
-  }, [aiInstance, selectedModel]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -77,7 +40,7 @@ const ChatInterface: React.FC = () => {
   useEffect(scrollToBottom, [messages]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || !aiInstance || isLoading) return;
+    if (!inputValue.trim() || isLoading) return;
 
     const userText = inputValue.trim();
     const userMessage: ChatMessage = {
@@ -102,65 +65,46 @@ const ChatInterface: React.FC = () => {
 
     try {
 
-      const response = await getResponse(messages, userMessage, selectedModel, threadId);
+      const response = await getResponse(userMessage, chatId, selectedModel);
 
-      if (response.threadId) {
-        setThreadId(response.threadId);
+      if (response.newChatId) {
+        setChatId(response.newChatId);
+        const newChat: NewChat =  {
+          _id: response.newChatId,
+          title: response.newChatTitle as string,
+        }
+        handleNewChatCreated(newChat);
       }
-      setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: response.response } : msg));
+
+      setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: response.response.text } : msg));
 
     } catch (error: any) {
       console.error('Error al generar respuesta:', error);
       setMessages(prev => prev.map(msg => msg._id === aiId ? { ...msg, text: 'Error al generar respuesta.', isError: true } : msg));
     } finally {
+      inputRef.current?.focus();
       setIsLoading(false);
       setIsGeneratingResponse(false);
-      setIsUserMessageSent(true);
     }
-  }, [inputValue, isLoading, aiInstance, messages, selectedModel]);
+  }, [inputValue, isLoading, messages, selectedModel]);
 
   useEffect(() => {
-    const saveChat = async () => {
-      if (!isGeneratingResponse && isUserMessageSent) {
-        if (messages.length === 3 && !chatId) {
-          const title = await generateChatTitle(messages);
-          const newChat = await createChat(title, messages, selectedModel, threadId);
-          setChatId(newChat._id);
-          handleNewChatCreated(newChat);
-        } else if (messages.length > 3 && chatId) {
-          const lastPair = messages.slice(-2);
-          await updateChatMessages(chatId, lastPair);
-        }
-        setIsUserMessageSent(false);
-      }
-    };
-    saveChat();
-  }, [messages, isUserMessageSent]);
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.sender == Sender.AI && !isLoading && !isGeneratingResponse) {
+      // Delay para garantizar que el input este montado
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [messages, isLoading, isGeneratingResponse]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedModel(e.target.value);
   };
-
-  if (apiKeyError) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen p-4">
-        <div className="max-w-md w-full bg-red-100 dark:bg-red-900 border-l-4 border-red-500 dark:border-red-700 text-red-700 dark:text-red-200 p-6 rounded-md shadow-lg" role="alert">
-          <p className="font-bold text-xl mb-2">Error de configuración</p>
-          <p>{apiKeyError}</p>
-          <p className="mt-4 text-sm">Por favor, asegúrese de que OPENAI_API_KEY esté definida en las variables del entorno.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!aiInstance) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-        <p className="text-slate-700 dark:text-slate-300 text-lg mt-4">Inicializando OpenAI...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex justify-center items-center h-screen p-0 sm:p-4 bg-slate-100 dark:bg-slate-900">
