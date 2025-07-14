@@ -30,6 +30,16 @@ export async function getChat(chatId: string): Promise<ChatType> {
   }
 }
 
+/**
+ * Obtiene la respuesta a un mensaje desde el servidor. Si es un nuevo chat, se crea y guarda en 
+ * la base de datos y retorna el ID y título del nuevo chat junto con la respuesta del LLM.
+ *
+ * @param {ChatMessage} userMessage - El mensaje del usuario.
+ * @param {string | null | undefined} chatId - ID del chat, si existe.
+ * @param {string} selectedModel - ID del modelo con el que se quiere interactuar.
+ * @returns {Promise<{newChatId: string | null, newChatTitle: string | null, response: ChatMessage}>} Una promesa que resuelve con los datos de la respuesta y del chat creado, si es nuevo.
+ * @throws {Error} Lanza un error si la solicitud al servidor falla.
+ */
 export async function getResponse(
   userMessage: ChatMessage,
   chatId: string | null | undefined,

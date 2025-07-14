@@ -1,3 +1,9 @@
+/**
+ * Verifica si el token del usuario expira en menos de 5 minutos.
+ *
+ * @param {string} token - El token del usuario.
+ * @returns {boolean} true si el token expira en menos de 5 minutos. false en caso contrario.
+ */
 export function isTokenExpiringSoon (token: string) {
   if (!token) return true;
 
@@ -10,6 +16,12 @@ export function isTokenExpiringSoon (token: string) {
   }
 };
 
+/**
+ * Solicita un nuevo token de acceso usando un refresh token.
+ *
+ * @param {string} refreshToken - El token de refresco del usuario.
+ * @returns {string | null} El nuevo token de acceso o null si la solicitud falla.
+ */
 export async function refreshAccessToken (refreshToken: string) {
   const baseUrl = process.env.VITE_BACKEND_URL || "http://localhost:3000";
   try {
@@ -27,6 +39,14 @@ export async function refreshAccessToken (refreshToken: string) {
   }
 };
 
+/**
+ * Obtiene el token de acceso del usuario del Local Storage. 
+ * 
+ * Si el token expira en menos de 5 minutos, intenta refrescalo automáticamente.
+ * Si no hay usuario autenticado o el refresh falla, redirige al login ('/login') y retorna null. 
+ *
+ * @returns {string | null} El token de acceso actualizado o null si no se encuentra.
+ */
 export async function getUserToken() {
   if (!localStorage.getItem("user")) {
     window.location.href = "/login";
