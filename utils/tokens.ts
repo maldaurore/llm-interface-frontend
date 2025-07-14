@@ -23,7 +23,7 @@ export function isTokenExpiringSoon (token: string) {
  * @returns {string | null} El nuevo token de acceso o null si la solicitud falla.
  */
 export async function refreshAccessToken (refreshToken: string) {
-  const baseUrl = process.env.VITE_BACKEND_URL || "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
   try {
     const response = await fetch(`${baseUrl}/auth/refresh`, { 
       method: 'POST',

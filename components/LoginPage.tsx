@@ -8,7 +8,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const baseUrl = process.env.BACKEND_URL || "http://localhost:3000";
+  const baseUrl = import.meta.env.BACKEND_URL || "http://localhost:3000";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

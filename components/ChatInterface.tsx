@@ -1,4 +1,3 @@
-// Adaptado completamente a OpenAI con el estilo visual original conservado
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sender, ChatMessage, NewChat } from '../types';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';

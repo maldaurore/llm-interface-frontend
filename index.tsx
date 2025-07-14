@@ -6,6 +6,7 @@ import LoginPage from './components/LoginPage.tsx';
 import RegisterPage from './components/RegisterPage.tsx';
 import ChatInterface from './components/ChatInterface.tsx';
 import ChatWrapper from './components/ChatWrapper.tsx';
+import './index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
