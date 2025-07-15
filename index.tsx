@@ -26,9 +26,8 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     children: [
-      { path: "", element: <Navigate to="/new-chat" replace />},
-      {path: "new-chat", element: <ChatInterface key={'new-chat'} />},
-      { path: "chat/:id", element: <ChatWrapper /> },
+      { path: "", element: <Navigate to="chats/new-chat" replace />},
+      { path: "chats/:id", element: <ChatInterface /> },
     ]
   },
 ])

@@ -55,8 +55,8 @@ const Layout: React.FC = () => {
 
   const handleNewChatCreated = (chat: Chat) => {
     setChats(prevChats => [chat, ...prevChats]);
-    const newPath = `/chat/${chat._id}`;
-    window.history.pushState({}, '', newPath);
+    const newPath = `/chats/${chat._id}`;
+    navigate(newPath, { replace: true })
   }
 
   const handleLogout = () => {
@@ -76,20 +76,20 @@ const Layout: React.FC = () => {
   if (!token || isTokenExpiringSoon(token)) return <Navigate to="/login" replace />;
 
   return (
-    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
+    <div className="flex h-full bg-slate-100 dark:bg-slate-900">
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 p-4 flex flex-col space-y-4">
+      <aside className="w-64 flex flex-col bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 p-4 h-full">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Zafirosoft</h2>
 
         <button
-          onClick={() => navigate('/new-chat')}
+          onClick={() => navigate('/chats/new-chat')}
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition"
         >
           + Nuevo chat
         </button>
 
-        <div className="flex-1 overflow-y-auto">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Chats anteriores</h3>
+        <h3 className="mt-4 text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Chats anteriores</h3>
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {chats.length === 0 && (
             <p className="text-sm text-slate-500 dark:text-slate-400">No tienes chats anteriores.</p>
           )}
@@ -97,7 +97,7 @@ const Layout: React.FC = () => {
             {chats.map((chat) => (
               <li key={chat._id}>
                 <button
-                  onClick={() => navigate(`/chat/${chat._id}`)}
+                  onClick={() => navigate(`/chats/${chat._id}`)}
                   className="w-full text-left px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-md text-sm text-slate-900 dark:text-white"
                 >
                   {chat.title}
@@ -109,14 +109,13 @@ const Layout: React.FC = () => {
 
         <button
           onClick={handleLogout}
-          className="px-4 py-2 text-sm text-red-600 hover:underline mt-auto"
+          className="px-4 py-2 text-sm text-red-600 hover:underline mt-4"
         >
           Cerrar sesión
         </button>
       </aside>
 
-      {/* Panel derecho donde cambia el contenido */}
-      <main className="flex-1 p-4 overflow-y-auto">
+      <main className="flex-1 p-4">
         <Outlet context={{ handleNewChatCreated }} />
       </main>
     </div>

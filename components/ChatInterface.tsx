@@ -10,6 +10,7 @@ interface LayoutContext {
 
 const ChatInterface: React.FC = () => {
   const { id } = useParams();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
@@ -23,13 +24,19 @@ const ChatInterface: React.FC = () => {
 
   useEffect(() => {
     const onIdChange = async () => {
-      setChatId(id);
-      if (id) {
-        const chat = await getChat(id);
-        setMessages(chat.messages || []);
-        setSelectedModel(chat.model || DEFAULT_MODEL_ID);
-      }
-    };
+      if (id === 'new-chat') {
+        setMessages([]);
+        setInputValue('');
+        setSelectedModel(DEFAULT_MODEL_ID);
+        setChatId(null)
+      } else if (id) {
+          setMessages([]);
+          const chat = await getChat(id as string);
+          setMessages(chat.messages || []);
+          setSelectedModel(chat.model || DEFAULT_MODEL_ID);
+          setChatId(id);
+        }
+      }; 
     onIdChange();
   }, [id]);
 
@@ -106,7 +113,7 @@ const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="flex justify-center items-center h-screen p-0 sm:p-4 bg-slate-100 dark:bg-slate-900">
+    <div className="flex justify-center items-center h-full w-full bg-slate-100 dark:bg-slate-900">
       <div className="flex flex-col h-full w-full max-w-3xl bg-white dark:bg-slate-800 shadow-xl rounded-none sm:rounded-lg overflow-hidden">
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-sm p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-slate-100">Zafirosoft Chat</h1>
