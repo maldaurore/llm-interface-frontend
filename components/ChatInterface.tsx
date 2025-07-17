@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sender, ChatMessage, NewChat } from '../types';
-import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
-import { getChat, getResponse } from '@/utils/chat-helpers';
+import { Sender, ChatMessage, NewChat, ModelOption } from '../types';
+import { getChat, getResponse, getUserModels } from '@/utils/chat-helpers';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 
 interface LayoutContext {
@@ -13,22 +12,32 @@ const ChatInterface: React.FC = () => {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [selectedModel, setSelectedModel] = useState<ModelOption | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [chatId, setChatId] = useState<string | null | undefined>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [userModels, setUserModels] = useState<ModelOption[]>([]);
   const { handleNewChatCreated } = useOutletContext<LayoutContext>();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadUserModels = async () => {
+      const models = await getUserModels();
+      setUserModels(models);
+      setSelectedModel(models[0]);
+    }
+    loadUserModels();
+  }, [])
 
   useEffect(() => {
     const onIdChange = async () => {
       if (id === 'new-chat') {
         setMessages([]);
         setInputValue('');
-        setSelectedModel(DEFAULT_MODEL_ID);
+        setSelectedModel(null);
         setChatId(null)
       } else if (id) {
           setMessages([]);
@@ -44,7 +53,7 @@ const ChatInterface: React.FC = () => {
           }
           
           setMessages(chat?.messages || []);
-          setSelectedModel(chat?.model || DEFAULT_MODEL_ID);
+          setSelectedModel(chat?.model || null);
           setChatId(id);
         }
       }; 
@@ -120,7 +129,8 @@ const ChatInterface: React.FC = () => {
   }, []);
 
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedModel(e.target.value);
+    const selected = userModels.find(model => model.modelId === e.target.value) || null;
+    setSelectedModel(selected);
   };
 
   return (
@@ -129,13 +139,13 @@ const ChatInterface: React.FC = () => {
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-sm p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-slate-100">Zafirosoft Chat</h1>
           <select
-            value={selectedModel}
+            value={selectedModel?.modelId}
             onChange={handleModelChange}
             disabled={typeof chatId === 'string'}
             className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-xs sm:text-sm rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2"
           >
-            {AVAILABLE_MODELS.map(model => (
-              <option key={model.id} value={model.id}>{model.name}</option>
+            {userModels.map(model => (
+              <option key={model.modelId} value={model.modelId}>{model.name}</option>
             ))}
           </select>
         </header>

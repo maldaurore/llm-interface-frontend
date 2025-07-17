@@ -13,7 +13,8 @@ export interface ChatMessage {
 }
 
 export interface ModelOption {
-  id: string;
+  _id: string;
+  modelId: string;
   name: string;
   type: string
 }
@@ -23,7 +24,7 @@ export interface Chat {
   title: string;
   messages?: ChatMessage[];
   user?: string;
-  model?: string;
+  model?: ModelOption;
   threadId?: string | null;
   braianSessionId?: string | null;
   createdAt: number;

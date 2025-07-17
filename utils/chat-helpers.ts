@@ -1,9 +1,25 @@
-import { ChatMessage } from '../types';
+import { ChatMessage, ModelOption } from '../types';
 import { Chat as ChatType } from '../types';
 import { getUserToken } from './tokens';
-import { AVAILABLE_MODELS } from '@/constants';
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+
+export async function getUserModels(): Promise<ModelOption[]> {
+  const response = await fetch(`${baseUrl}/chat-models/user-models`, {
+    headers: {
+      Authorization: `Bearer ${await getUserToken()}`,
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Ocurrió un error al obtener los modelos disponibles para el usuario.")
+  }
+
+  const models = await response.json();
+
+  return models;
+
+}
 
 /**
  * Obtiene un chat específico desde el servidor utilizando su ID.
@@ -48,10 +64,10 @@ export async function getChat(chatId: string): Promise<ChatType> {
 export async function getResponse(
   userMessage: ChatMessage,
   chatId: string | null | undefined,
-  selectedModel: string
+  selectedModel: ModelOption | null
 ): Promise<{newChatId: string | null, newChatTitle: string | null, response: ChatMessage}> {
 
-  const chatType = AVAILABLE_MODELS.find(model => model.id == selectedModel)?.type;
+  const chatType = selectedModel?.type;
   const response = await fetch(`${baseUrl}/chats/get-response`, {
     method: 'POST',
     headers: {
@@ -62,7 +78,7 @@ export async function getResponse(
       chatId,
       chatType,
       message: userMessage,
-      model: selectedModel,
+      model: selectedModel?.modelId,
     })
   });
   if (!response.ok) {
