@@ -31,7 +31,7 @@ const RegisterPage: React.FC = () => {
       const response = await fetch("http://localhost:3000/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, chats: [] }),
+        body: JSON.stringify({ email, password, name }),
       });
 
       if (!response.ok) {

@@ -20,13 +20,18 @@ export async function getChat(chatId: string): Promise<ChatType> {
       },
     });
     if (!response.ok) {
+      if (response.status == 401) {
+        const err = new Error(response.statusText);
+        (err as any).code = 401;
+        throw err;
+      }
       throw new Error(`Error al obtener el chat: ${response.status} ${response.statusText}`);
     }
     const chat = await response.json();
     return chat.chat;
   } catch (e) {
     console.error("Error al obtener el chat:", e);
-    throw e; // Re-lanzar error para manejarlo en el componente
+    throw e;
   }
 }
 

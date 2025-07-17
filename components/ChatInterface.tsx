@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sender, ChatMessage, NewChat } from '../types';
 import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from '../constants';
 import { getChat, getResponse } from '@/utils/chat-helpers';
-import { useOutletContext, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 
 interface LayoutContext {
   handleNewChatCreated: (chat: NewChat) => void;
@@ -21,6 +21,7 @@ const ChatInterface: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const navigate = useNavigate()
 
   useEffect(() => {
     const onIdChange = async () => {
@@ -31,9 +32,19 @@ const ChatInterface: React.FC = () => {
         setChatId(null)
       } else if (id) {
           setMessages([]);
-          const chat = await getChat(id as string);
-          setMessages(chat.messages || []);
-          setSelectedModel(chat.model || DEFAULT_MODEL_ID);
+          let chat;
+          try {
+            chat = await getChat(id as string);
+          } catch (e: any) {
+            if (e.code == 401) {
+              navigate('/');
+            } else {
+              console.error('Error al obtener el chat: ', e);
+            }
+          }
+          
+          setMessages(chat?.messages || []);
+          setSelectedModel(chat?.model || DEFAULT_MODEL_ID);
           setChatId(id);
         }
       }; 
